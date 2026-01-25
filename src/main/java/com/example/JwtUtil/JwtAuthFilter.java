@@ -19,10 +19,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtil jwtUtil;
-    
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/login");
+        String path = request.getRequestURI();
+        return path.startsWith("/login")
+            || path.startsWith("/swagger-ui")
+            || path.startsWith("/v3/api-docs")
+            || path.startsWith("/error");
     }
 
     @Override
@@ -33,46 +37,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        	 SecurityContextHolder.clearContext(); // ✅ important
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
 
-             response.reset(); // ✅ FIRST
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
+            String token = authHeader.substring(7);
 
-            response.getWriter().write(
-                "{\"status\":401,\"message\":\"JWT token required\"}"
-            );
-            response.getWriter().flush();
-            return;
-        }
+            try {
+                String user = jwtUtil.validateAndExtract(token);
 
-       // String token = authHeader.substring(7);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                user,
+                                null,
+                                Collections.emptyList()
+                        );
 
-        try {
-        	String token = authHeader.substring(7);
-            String user = jwtUtil.validateAndExtract(token);
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            user, null, Collections.emptyList());
-
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
-
-        } catch (Exception e) {
-        	SecurityContextHolder.clearContext(); // ✅ important
-            response.reset();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-
-            response.getWriter().write(
-                "{\"status\":401,\"message\":\"Invalid or expired JWT\"}"
-            );
-            response.getWriter().flush(); 
-            return;
+            } catch (Exception e) {
+                SecurityContextHolder.clearContext();
+            }
         }
 
         chain.doFilter(request, response);
