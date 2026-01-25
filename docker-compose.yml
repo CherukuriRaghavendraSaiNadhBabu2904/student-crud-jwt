@@ -9,14 +9,20 @@ services:
       MYSQL_DATABASE: schooldb
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   app:
-    image: crud-operation-app   # ⚠️ IMPORTANT (build kaadu)
+    image: crud-operation-app
     container_name: crud-operation-app
     ports:
       - "8081:8081"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
 volumes:
   mysql-data:
