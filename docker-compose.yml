@@ -7,13 +7,11 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: schooldb
-#    ports:
-#      - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
 
   app:
-    build: .
+    image: crud-operation-app   # ⚠️ IMPORTANT (build kaadu)
     container_name: crud-operation-app
     ports:
       - "8081:8081"
