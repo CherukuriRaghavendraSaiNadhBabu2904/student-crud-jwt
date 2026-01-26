@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.JwtUtil.JwtUtil;
+import com.example.security.JwtUtil;
 
 @RestController
 public class AuthController {

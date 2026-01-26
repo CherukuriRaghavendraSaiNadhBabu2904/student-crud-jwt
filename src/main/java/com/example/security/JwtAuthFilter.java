@@ -1,4 +1,4 @@
-package com.example.JwtUtil;
+package com.example.security;
 
 import java.io.IOException;
 import java.util.Collections;
