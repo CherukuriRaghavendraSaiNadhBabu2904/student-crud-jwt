@@ -1,17 +1,15 @@
-name: Java CI - Date Based Version
+name: Build & Deploy to EC2
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -20,70 +18,28 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      - name: Generate Date Based Version (IST)
-        id: version
-        run: |
-          VERSION=$(TZ=Asia/Kolkata date +"%d.%m.%Y-%I.%M%p")
-          echo "Build Version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Build with Maven
-        run: mvn clean package -DskipTests --batch-mode
+        run: mvn clean package -DskipTests
 
-      - name: Upload build artifact (Date Versioned)
-        uses: actions/upload-artifact@v4
-        with:
-          name: student-crud-jwt-${{ steps.version.outputs.version }}
-          path: target/*.jar
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Build & Push Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/student-crud-jwt:${{ steps.version.outputs.version }} .
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/student-crud-jwt:${{ steps.version.outputs.version }} \
-                     ${{ secrets.DOCKERHUB_USERNAME }}/student-crud-jwt:latest
+          docker build -t raghavendradocker2904/student-crud-jwt:latest .
+          docker push raghavendradocker2904/student-crud-jwt:latest
 
-      - name: Push Docker image to DockerHub
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/student-crud-jwt:${{ steps.version.outputs.version }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/student-crud-jwt:latest
-
-
-      # ---------------- CD PART (COMMENTED) ----------------
-      #
-      # - name: Copy JAR to CI Server (SCP)
-      #   uses: appleboy/scp-action@v0.1.7
-      #   with:
-      #     host: ${{ secrets.CI_HOST }}
-      #     username: ${{ secrets.CI_USER }}
-      #     key: ${{ secrets.CI_SSH_KEY }}
-      #     source: "target/*.jar"
-      #     target: "/opt/apps/student-crud-jwt/"
-      #
-      # - name: Deploy on CI Server (SSH)
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ secrets.CI_HOST }}
-      #     username: ${{ secrets.CI_USER }}
-      #     key: ${{ secrets.CI_SSH_KEY }}
-      #     script: |
-      #       echo "Stopping old application (if running)"
-      #       pkill -f student-crud-jwt || true
-      #
-      #       echo "Starting new application"
-      #       nohup java -jar /opt/apps/student-crud-jwt/*.jar \
-      #         > /opt/apps/student-crud-jwt/app.log 2>&1 &
-      #
-      #       echo "Deployment completed successfully"
+      - name: Deploy to EC2 via SSH (Docker Compose)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 3.148.168.157
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d
